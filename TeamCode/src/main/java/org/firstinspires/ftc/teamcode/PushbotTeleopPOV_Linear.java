@@ -29,10 +29,15 @@
 
 package org.firstinspires.ftc.teamcode;
 
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.util.Range;
+import com.qualcomm.robotcore.hardware.Servo;
+
+
+
+
+
 
 /**
  * This OpMode uses the common Pushbot hardware class to define the devices on the robot.
@@ -44,23 +49,22 @@ import com.qualcomm.robotcore.util.Range;
  * It raises and lowers the claw using the Gampad Y and A buttons respectively.
  * It also opens and closes the claws slowly using the left and right Bumper buttons.
  *
+ *
  * Use Android Studios to Copy this Class, and Paste it into your team's code folder with a new name.
  * Remove or comment out the @Disabled line to add this opmode to the Driver Station OpMode list
  */
 
-@TeleOp(name="Pushbot: Teleop POV", group="Pushbot")
+@TeleOp(name="10448 teleop controlled period", group="Pushbot")
 //@Disabled
 public class PushbotTeleopPOV_Linear extends LinearOpMode {
 
     /* Declare OpMode members. */
     HardwarePushbot robot           = new HardwarePushbot();   // Use a Pushbot's hardware
-    double          clawOffset      = 0;                       // Servo mid position
+    double          clawOffset      = 0;                       // Servo mid A
     final double    CLAW_SPEED      = 0.02 ;                   // sets rate to move servo
-    final double    turns_speed;
     //hi
-    {
-        turns_speed =.25;
-    }
+     static double MAX_POS     =  1.0;   
+     static double MIN_POS     =  0.0;   
 
     @Override
     public void runOpMode() {
@@ -71,13 +75,20 @@ public class PushbotTeleopPOV_Linear extends LinearOpMode {
         double max;
         double turns;
         double leftArm;
-        /* Initialize the hardware variables.
-         * The init() method of the hardware class does all the work here
-         */
-        robot.init(hardwareMap);
-
+        int rotate;
+        int rotate0;
+        int rotate2;
+        int trim;
+        Servo servo;
+        final double INCREMENT   = 0.01;     // amount to slew servo each CYCLE_MS cycle
+        final int CYCLE_MS    =   50;     // period of each cycle/* Initialize the hardware variables.
+         // Maximum rotational position * The init() method of the hardware class does all the work here
+         // Minimum rotational position */
+        double  position = (MAX_POS - MIN_POS) / 2; // Start at halfway
+        //position robot.init(hardwareMap);
+        boolean rampUp = true;
         // Send telemetry message to signify robot waiting;
-        telemetry.addData("Say", "Hello Driver");    //
+        telemetry.addData("Say", "Hello Driver Lookin good today");    //
         telemetry.update();
 
         // Wait for the game to start (driver presses PLAY)
@@ -85,7 +96,9 @@ public class PushbotTeleopPOV_Linear extends LinearOpMode {
 
         // run until the end of the match (driver presses STOP)
         while (opModeIsActive()) {
-
+             servo = hardwareMap.get(Servo.class, "left_hand");
+            //autonomous
+            
             // Run wheels in POV mode (note: The joystick goes negative when pushed forwards, so negate it)
             // In this mode the Left stick moves the robot fwd and back, the Right stick turns left and right.
             // This way it's also easy to just drive straight, or just turn.
@@ -93,13 +106,12 @@ public class PushbotTeleopPOV_Linear extends LinearOpMode {
             turn  =  -gamepad1.right_stick_x;
             //turns thing
             turns = 0;
+            trim=0;
             leftArm = turns;
-
             //leftArm = gamepad1.right_trigger;
             // Combine drive and turn for blended motion.
             left  = drive + turn;
             right = drive - turn;
-
             // Normalize the values so neither exceed +/- 1.0
             max = Math.max(Math.abs(left), Math.abs(right));
             if (max > 1.0)
@@ -120,40 +132,35 @@ public class PushbotTeleopPOV_Linear extends LinearOpMode {
             if (gamepad1.left_trigger>0)
                 turns = -.45;
                 robot.leftArm.setPower(turns);
-            turns = turns_speed;
-            // Use gamepad left & right Bumpers to open and close the claw
-            if (gamepad1.a){
-                robot.leftDrive.setPower(0.5);
-                robot.rightDrive.setPower(0.5);
-            } else {
-                robot.leftDrive.setPower(left);
-                robot.rightDrive.setPower(right);
-            }
-            if (gamepad1.right_bumper) {
-                clawOffset += CLAW_SPEED;
-            } else if (gamepad1.left_bumper) {
-                clawOffset -= CLAW_SPEED;
-            }
 
-            // Move both servos to new position.  Assume servos are mirror image of each other.
-            clawOffset = Range.clip(clawOffset, -0.5, 0.5);
-            robot.leftClaw.setPosition(robot.MID_SERVO + clawOffset);
-            robot.rightClaw.setPosition(robot.MID_SERVO - clawOffset);
 
-            // Use gamepad buttons to move arm up (Y) and down (A)
-            //if (gamepad1.y)
-            //    robot.leftArm.setPower(robot.ARM_UP_POWER);
-            //else if (gamepad1.a)
-            //    robot.leftArm.setPower(robot.ARM_DOWN_POWER);
-            //else
-                //robot.leftArm.setPower(0.0);
-            // Send telemetry message to signify robot running;
+
+            if (rampUp) {
+
+                // Keep stepping up until we hit the max value.
+                    position += INCREMENT ;
+                if (position >= MAX_POS ) {
+                    position = MAX_POS;
+                    rampUp = !rampUp;   // Switch ramp direction
+                    }
+                    }
+                else {
+                    // Keep stepping down until we hit the min value.
+                    position -= INCREMENT ;
+                    if (position <= MIN_POS ) {
+                        position = MIN_POS;
+                        rampUp =! rampUp;  // Switch ramp direction
+                    }// Move both servos to new position.  Assume servos are mirror image of each other.
+                }
+            servo.setPosition(position);
+            sleep(CYCLE_MS);// Send telemetry message to signify robot running;
+            idle();
             telemetry.addData("claw",  "Offset = %.2f", clawOffset);
             telemetry.addData("left",  "%.2f", left);
             telemetry.addData("right", "%.2f", right);
             telemetry.addData("leftArm","%.2f",leftArm);
+            telemetry.addData("Servo Position", "%5.2f", position);
             telemetry.update();
-
             // Pace this loop so jaw action is reasonable speed.
             sleep(50);
         }
